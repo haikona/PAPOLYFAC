@@ -19,10 +19,6 @@ class AssociatedFactor:
             # Not the first frame
             self.FFbase = self.segment.frame.prev.FF
 
-        if self.segment.frame.E * self.segment.frame.F * self.segment.Eplus * self.Fplus == self.segment.frame.Phi.degree():
-            # Polynomial is irreducible
-            return
-
         if self.Fplus == 1:
             self.FF = self.FFbase
             self.FFz = PolynomialRing(self.FF,'z'+str(self.segment.frame.depth))
@@ -77,6 +73,11 @@ class AssociatedFactor:
 
     def next_frame(self,length=infinity):
         from frame import Frame
+        if self.segment.slope == infinity:
+            next = Frame(self.segment.frame.Phi,self,self.segment.frame.iteration)
+            self.next = next
+            next.seed(self.segment.frame.phi,length=length)
+            return next            
         if self.Fplus == 1 and self.segment.Eplus == 1:
             next = Frame(self.segment.frame.Phi,self.segment.frame.prev,self.segment.frame.iteration)
         else:

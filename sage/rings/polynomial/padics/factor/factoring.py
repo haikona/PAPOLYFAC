@@ -1,8 +1,8 @@
-from sage.rings.padics.factory import ZpFM
+from sage.rings.padics.factory import ZpFM, Zp
 from sage.rings.polynomial.polynomial_ring_constructor import PolynomialRing
 from sage.rings.polynomial.padics.factor.frame import Frame
 
-def pfactortree(Phi):
+def pfactor(Phi):
     r"""
     Return a factorization of Phi
 
@@ -20,53 +20,35 @@ def pfactortree(Phi):
 
     Factoring polynomials over Zp(2)[x]::
 
-        sage: from sage.rings.polynomial.padics.factor.factoring import jorder4,pfactortree
+        sage: from sage.rings.polynomial.padics.factor.factoring import jorder4,pfactor
         sage: f = ZpFM(2,24,'terse')['x']( (x^32+16)*(x^32+16+2^16*x^2)+2^34 )
-        sage: pfactortree(f) # long (3.8s)
+        sage: pfactor(f) # long (3.8s)
         [(1 + O(2^24))*x^64 + (65536 + O(2^24))*x^34 + (32 + O(2^24))*x^32 + (1048576 + O(2^24))*x^2 + (256 + O(2^24))]
 
     See the irreducibility of x^32+16 in Zp(2)[x]::
 
-        sage: pfactortree(ZpFM(2)['x'](x^32+16))
+        sage: pfactor(ZpFM(2)['x'](x^32+16))
         [(1 + O(2^20))*x^32 + (2^4 + O(2^20))]
 
     Test the irreducibility of test polynomial jorder4 for Zp(3)::
 
-        sage: len(pfactortree(jorder4(3))) == 1
+        sage: len(pfactor(jorder4(3))) == 1
         True
 
     Factor jorder4 for Zp(5) and Zp(7) and check that the products return the original::
 
-        sage: ff = pfactortree(jorder4(5))
+        sage: ff = pfactor(jorder4(5))
         sage: prod(ff) == jorder4(5)
         True
-        sage: ff = pfactortree(jorder4(7))
+        sage: ff = pfactor(jorder4(7))
         sage: prod(ff) == jorder4(7)
         True
 
     AUTHORS::
 
-        - Brian Sinclair (2012-02-22): initial version
+        - Brian Sinclair and Sebastian Pauli (2012-02-22): initial version
 
     """
-    from sage.misc.flatten import flatten
-
-    def followsegment(next,Phi):
-        """ Returns next if it corresponds to an irreducible factor of $\Phi$ and follows every branch if not """
-        # Handle the unlikely event that our approximation is actually a factor
-        if next.phi_divides_Phi():
-            return next
-        # With E potentially increased, Check to see if E*F == deg(Phi) (and thus Phi is irreducible)
-        if next.E * next.F * next.polygon[0].Eplus == Phi.degree():
-            return next
-        # With F potentially increaded, Check to see if E*F == deg(Phi) (and thus Phi is irreducible)
-        if next.E * next.F * next.polygon[0].Eplus * next.polygon[0].factors[0].Fplus == Phi.degree():
-            return next
-        # Check if we should begin Single Factor Lifting
-        if sum([seg.length for seg in next.polygon]) == 1:
-            return next
-        return [[followsegment(fact.next_frame(fact.rhoexp+1),Phi) for fact in seg.factors] for seg in next.polygon]
-
     # Handle the situation that x is a factor of $\Phi(x)$
     if Phi.constant_coefficient() == 0:
         x_divides = True
@@ -74,38 +56,95 @@ def pfactortree(Phi):
     else:
         x_divides = False
 
+    # Build an OM Tree for Phi
+    tree = OM_tree(Phi)
+
+    # If we only have one leaf, Phi is irreducible, so we do not lift it.
+    if len(tree) == 1:
+        return ([Phi.parent().gen()] if x_divides else []) + [Phi]
+    # quo_rem is faster than single_factor_lift, so Phi = f*g are specially handled
+    if len(tree) == 2:
+        if tree[0].phi.degree() < tree[1].phi.degree():
+            fact = single_factor_lift(tree[0])
+            return ([Phi.parent().gen()] if x_divides else []) + [fact,Phi.quo_rem(fact)[0]]
+        else:
+            fact = single_factor_lift(tree[1])
+            return ([Phi.parent().gen()] if x_divides else []) + [fact,Phi.quo_rem(fact)[0]]            
+    # Phi has more than two factors, so we lift them all
+    return ([Phi.parent().gen()] if x_divides else []) + [single_factor_lift(frame) for frame in tree]
+
+
+def OM_tree(Phi):
+    r"""
+    Return an OM (Okutsu-Montes / Ore-Mac Lane) tree for Phi
+
+    INPUT::
+
+        - ``Phi`` -- squarefree, monic padic polynomial with fixed precision coefficients
+
+    OUTPUT::
+
+        - list -- leaves of the OM tree of Phi
+
+    AUTHORS::
+
+        - Brian Sinclair and Sebastian Pauli (2012-02-22): initial version
+
+    """
+    from sage.misc.flatten import flatten
+
+    def followsegment(next,Phi):
+        """ Returns next if it corresponds to an irreducible factor of $\Phi$ 
+            and follows every branch if not """
+        # Handle the unlikely event that our approximation is actually a factor
+        if next.is_first() == False and next.phi == next.prev_frame().phi:
+            return [next]
+        if next.phi_divides_Phi():
+            return [next] + [[followsegment(fact.next_frame(fact.rhoexp+1),Phi)
+                              for fact in seg.factors] for seg in next.polygon[1:]]
+        # With E potentially increased, Check to see if E*F == deg(Phi)
+        # (and thus Phi is irreducible)
+        if next.E * next.F * next.polygon[0].Eplus == Phi.degree():
+            return next
+        # With F potentially increaded, Check to see if E*F == deg(Phi)
+        # (and thus Phi is irreducible)
+        if next.E * next.F * next.polygon[0].Eplus * next.polygon[0].factors[0].Fplus == Phi.degree():
+            return next
+        # Check if we should begin Single Factor Lifting
+        if sum([seg.length for seg in next.polygon]) == 1:
+            return next
+        return [[followsegment(fact.next_frame(fact.rhoexp+1),Phi)
+                 for fact in seg.factors] for seg in next.polygon]
+
     # Construct and initialize the first frame (phi = x)
     next = Frame(Phi)
     next.first()
 
-    # With E potentially increased, Check to see if E*F == deg(Phi) (and thus Phi is irreducible)
+    # With E potentially increased, Check to see if E*F == deg(Phi)
+    # (and thus Phi is irreducible)
     if next.E * next.F * next.polygon[0].Eplus == Phi.degree():
-        return ([Phi.parent().gen()] if x_divides else []) + [Phi]
-    # With F potentially increaded, Check to see if E*F == deg(Phi) (and thus Phi is irreducible)
+        return [next]
+
+    # With F potentially increaded, Check to see if E*F == deg(Phi)
+    # (and thus Phi is irreducible)
     if next.E * next.F * next.polygon[0].Eplus * next.polygon[0].factors[0].Fplus == Phi.degree():
-        return ([Phi.parent().gen()] if x_divides else []) + [Phi]
+        return [next]
+
+    # Handle the special case wherein our initial approximation (phi = x) is a factor
+    if next.phi_divides_Phi():
+        tree = [next] + [[followsegment(fact.next_frame(fact.rhoexp+1),Phi)
+                          for fact in seg.factors] for seg in next.polygon[1:]]
 
     # Construct the next level of the tree by following every factor of the
     # residual polynomials of every Newton polygon segment in our frame
-    tree = [[followsegment(fact.next_frame(fact.rhoexp+1),Phi) for fact in seg.factors] for seg in next.polygon]
+    else:
+        tree = [[followsegment(fact.next_frame(fact.rhoexp+1),Phi)
+                 for fact in seg.factors] for seg in next.polygon]
 
     # tree contains the leaves of the tree of frames and each leaf corresponds
     # to an irreducible factor of Phi, so we flatten the list and start lifting
-    flat = flatten(tree)
+    return flatten(tree)
 
-    # If we only have one leaf, Phi is irreducible, so we do not lift it.
-    if len(flat) == 1:
-        return ([Phi.parent().gen()] if x_divides else []) + [Phi]
-    # quo_rem is faster than Improve, so Phi = f*g are specially handled
-    if len(flat) == 2:
-        if flat[0].phi.degree() < flat[1].phi.degree():
-            fact = Improve(flat[0])
-            return ([Phi.parent().gen()] if x_divides else []) + [fact,Phi.quo_rem(fact)[0]]
-        else:
-            fact = Improve(flat[1])
-            return ([Phi.parent().gen()] if x_divides else []) + [fact,Phi.quo_rem(fact)[0]]
-    # Phi has more than two factors, so we lift them all
-    return ([Phi.parent().gen()] if x_divides else []) + [Improve(frame) for frame in flatten(tree)]
 
 def jorder4(p):
     r"""
@@ -138,19 +177,19 @@ def jorder4(p):
     f4 = f3**2+20*p**2*f3*f2*(x+1)**2+64*p**9*f1;
     return f4;
 
-def Improve(frame,prec=2**20):
+def single_factor_lift(frame,prec=2**20):
     r"""
     Lift a frame to a factor
 
     EXAMPLES::
-        sage: from sage.rings.polynomial.padics.factor.factoring import Improve
+        sage: from sage.rings.polynomial.padics.factor.factoring import single_factor_lift
         sage: from sage.rings.polynomial.padics.factor.frame import Frame
         sage: Kx.<x> = PolynomialRing(ZpFM(3,20,'terse'))
         sage: f = (x**3+x-1)*(x**2+1)
         sage: fr = Frame(f)
         sage: fr.first()
         sage: fr = fr.polygon[0].factors[0].next_frame()
-        sage: fact = Improve(fr) ; fact
+        sage: fact = single_factor_lift(fr) ; fact
         (1 + O(3^20))*x + (904752403 + O(3^20))
         sage: f % fact
         0
@@ -159,7 +198,7 @@ def Improve(frame,prec=2**20):
     def _reduce(poly,phi,d):
         """ returns poly mod phi and simplifies the denominator of poly """
         poly = phi.parent()(poly) % phi
-        if d != 1:
+        if d != 0:
             g = min([d] + [p.valuation() for p in poly])
             if g > 0:
                 poly = poly.parent( [p >> g for p in poly] )

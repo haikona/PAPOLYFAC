@@ -1,5 +1,6 @@
 from sage.rings.polynomial.padics.factor.associatedfactor import AssociatedFactor
 from sage.rings.arith import gcd
+from sage.rings.infinity import infinity
 
 class Segment:
 
@@ -15,14 +16,11 @@ class Segment:
         self.slope = slope
         self.length = length
         self.Eplus = self.e() / gcd(self.e(),int(self.frame.E))
-        if self.frame.E * self.frame.F * self.Eplus < self.frame.Phi.degree():
+        if slope != infinity:
             self.psi = self.frame.find_psi(self.slope*self.Eplus)
-            self._associate_polynomial = self.associate_polynomial(cached=False)
-            self.factors = [AssociatedFactor(self,afact[0],afact[1]) 
-                            for afact in list(self._associate_polynomial.factor())]
-        else:
-            # Polynomial is irreducible
-            return
+        self._associate_polynomial = self.associate_polynomial(cached=False)
+        self.factors = [AssociatedFactor(self,afact[0],afact[1]) 
+                        for afact in list(self._associate_polynomial.factor())]
 
     def h(self):
         """
@@ -31,6 +29,8 @@ class Segment:
         EXAMPLES::
 
         """
+        if isinstance(self.slope,PlusInfinity):
+            return self.slope
         if isinstance(self.slope,int):
             return self.slope.numerator
         else:
@@ -42,6 +42,8 @@ class Segment:
         EXAMPLES::
 
         """
+        if self.slope == infinity:
+            return 1
         if isinstance(self.slope,int):
             return self.slope.denominator
         else:
@@ -73,18 +75,25 @@ class Segment:
         """
         if cached:
             return self._associate_polynomial()
-        else:
-            a = self.frame.elt_phi_expansion()
-            vertx = [v[0] for v in self.vertex]
-            chiex = [int((v-vertx[0]) // self.Eplus) for v in vertx]
-            chi = [a[vertx[i]] * self.psi**chiex[i] for i in range(len(vertx))]
-            psitilde = self.frame.find_psi(chi[0].valuation())
-            Ahat = [(c/psitilde).reduce() for c in chi]
+
+        if self.slope == infinity:
             if self.frame.prev == None:
-                Az = sum([(Ahat[i].residue()) * self.frame.Rz.gen() ** chiex[i] for i in range(len(Ahat))])
+                Az = self.frame.Rz.gen() ** self.length
             else:
-                Az = sum([(Ahat[i].residue()) * self.frame.prev.FFz.gen() ** chiex[i] for i in range(len(Ahat))])
+                Az = self.frame.prev.FFz.gen() ** self.length
             return Az
+
+        a = self.frame.elt_phi_expansion()
+        vertx = [v[0] for v in self.vertex]
+        chiex = [int((v-vertx[0]) // self.Eplus) for v in vertx]
+        chi = [a[vertx[i]] * self.psi**chiex[i] for i in range(len(vertx))]
+        psitilde = self.frame.find_psi(chi[0].valuation())
+        Ahat = [(c/psitilde).reduce() for c in chi]
+        if self.frame.prev == None:
+            Az = sum([(Ahat[i].residue()) * self.frame.Rz.gen() ** chiex[i] for i in range(len(Ahat))])
+        else:
+            Az = sum([(Ahat[i].residue()) * self.frame.prev.FFz.gen() ** chiex[i] for i in range(len(Ahat))])
+        return Az
 
     def __repr__(self):
         """

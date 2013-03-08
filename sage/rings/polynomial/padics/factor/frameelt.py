@@ -27,6 +27,8 @@ class FrameElt:
         if not purge:
             return min([a.valuation() for a in self.rep])
         else:
+            if self.rep == []:
+                return self.frame.O.precision_cap()
             v = min([a.valuation() for a in self.rep])
             self.rep = [a for a in self.rep if a.valuation() == v]
             return v
