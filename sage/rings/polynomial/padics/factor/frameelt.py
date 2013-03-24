@@ -36,11 +36,36 @@ class FrameElt:
 
     EXAMPLES::
 
+    If the FrameElt comes from the first frame, the term must be a constant::
+
+        sage: from sage.rings.polynomial.padics.factor.frame import Frame
+        sage: k = ZpFM(2,20,'terse'); kx.<x> = k[]
+        sage: f = Frame(x^32+16); f.seed(x)
+        sage: FrameElt(f,6)
+        [FET<pi^1*3 + O(2^20)>]
+
+    Otherwise the we have an error (from FrameEltTerm)::
+
+        sage: FrameElt(f,x+1)
+        Traceback (most recent call last):
+        ...
+        TypeError: not a constant polynomial
+
+    Moving to a higher frame and representing 6x^2 + 1.  Notice that the
+    first FrameEltTerm represents 1 and the second (3 * 2^1)*x^2::
+
+        sage: f = f.polygon[0].factors[0].next_frame(); f
+        Frame with phi (1 + O(2^20))*x^8 + (1048574 + O(2^20))
+        sage: FrameElt(f,6*x^2 + 1)
+        [FET<0,[FET<pi^0*1 + O(2^20)>]>, FET<2,[FET<pi^1*3 + O(2^20)>]>]
+
     """
 
     def __init__(self,frame,a=None,this_exp=None):
         """
         Initializes self.
+
+        See ``FrameElt`` for full documentation.
 
         """
         # deg(a) < deg(frame.phi)*frame.Eplus*frame.Fplus
@@ -179,8 +204,23 @@ class FrameElt:
 
     def polynomial(self,denominator=False):
         """
-        Returns self as a polynomial, optionally with the power of the
-        uniformizor present in its denominator.
+        Returns ``self`` as a polynomial, optionally with the power of the
+        uniformizer present in its denominator.
+
+        INPUT:
+
+        - ``denominator`` -- Boolean, default False.  If True, returns the
+          polynomial of ``self`` multiplied by the uniformizer to the highest
+          power it appears in the denominator of ``self`` and that power as
+          a tuple.
+
+        OUTPUT:
+
+        - If ``denominator`` is False, ``self`` as a polynomial.
+
+        - If ``denominator`` is True, returns the tuple of ``self`` multiplied
+          to not have a denominator and the power of the uniformizer required
+          to clear the denominator.
 
         EXAMPLES::
 
@@ -209,6 +249,7 @@ class FrameElt:
         return self.__add__(l)
 
     def __add__(self,r):
+        # For using sum() command, must be able to be added to int(0)
         if isinstance(r,int) and r == 0:
             return self
         if self.frame.phi != r.frame.phi:
@@ -272,6 +313,55 @@ class FrameElt:
         return product
 
     def __pow__(self,n):
+        """
+        Raise ``self`` to the integer power ``n``.
+
+        Only single term FrameElts with single terms in all recursive FrameElts
+        and FrameEltTerms can be raised this way.
+
+        EXAMPLES::
+
+        Building the needed framework and squaring 6 as a FrameElt::
+
+            sage: from sage.rings.polynomial.padics.factor.frame import Frame
+            sage: k = ZpFM(2,20,'terse'); kx.<x> = k[]
+            sage: f = Frame(x^32+16); f.seed(x)
+            sage: fe = FrameElt(f,6); fe
+            [FET<pi^1*3 + O(2^20)>]
+            sage: fe.polynomial()
+            6 + O(2^20)
+            sage: fe.__pow__(2)
+            [FET<pi^2*9 + O(2^20)>]
+            sage: fe ** 2
+            [FET<pi^2*9 + O(2^20)>]
+            sage: (fe**2).polynomial()
+            36 + O(2^20)
+
+        Moving to a higher frame and squaring 6x^2 as a FrameElt::
+
+            sage: f = f.polygon[0].factors[0].next_frame()
+            sage: fe = FrameElt(f,6*x**2);fe  
+            [FET<2,[FET<pi^1*3 + O(2^20)>]>]
+            sage: fe.polynomial()
+            (6 + O(2^20))*x^2
+            sage: fe.__pow__(2)                          
+            [FET<4,[FET<pi^2*9 + O(2^20)>]>]
+            sage: fe**2        
+            [FET<4,[FET<pi^2*9 + O(2^20)>]>]
+            sage: (fe**2).polynomial()
+            (36 + O(2^20))*x^4
+
+        As soon as we are past the first frame, we must take care not to
+        try to take powers of non-single-term FrameElts::
+
+            sage: fe = FrameElt(f,6*x^2+1); fe
+            [FET<0,[FET<pi^0*1 + O(2^20)>]>, FET<2,[FET<pi^1*3 + O(2^20)>]>]
+            sage: fe ** 2
+            Traceback (most recent call last):
+            ...
+            NotImplementedError: Cannot take a power of a non-single term FrameElt
+
+        """
         if not self.is_single_term():
             raise NotImplementedError, "Cannot take a power of a non-single term FrameElt"
         else:
@@ -320,11 +410,11 @@ class FrameEltTerm:
         sage: from sage.rings.polynomial.padics.factor.frame import Frame
         sage: k = ZpFM(2,20,'terse'); kx.<x> = k[]
         sage: f = Frame(x^32+16); f.seed(x)
-        sage: elt = FrameElt(f)   
+        sage: elt = FrameElt(f)
         sage: FrameEltTerm(elt,3,2)
         FET<pi^2*3 + O(2^20)>
 
-    If the uniformizer divides a constant, the FrameElt corrects the exponent::
+    If the uniformizer divides a constant, the FrameEltTerm corrects the exponent::
 
         sage: FrameEltTerm(elt,6,0)
         FET<pi^1*3 + O(2^20)>
@@ -374,6 +464,8 @@ class FrameEltTerm:
     def valuation(self):
         """
         Returns the valuation of self
+
+        EXAMPLES::
     
         """
         if self._cached_valuation == None:
