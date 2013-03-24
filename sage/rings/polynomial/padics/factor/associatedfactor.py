@@ -1,3 +1,11 @@
+r"""
+Irreduble factors of associate polynomials needed for OM computations
+
+AUTHORS:
+
+- Brian Sinclair and Sebastian Pauli (2012-02-22): initial version
+
+"""
 from sage.rings.polynomial.polynomial_ring_constructor import PolynomialRing
 from sage.rings.finite_rings.constructor import GF
 from sage.matrix.constructor import Matrix
@@ -5,8 +13,36 @@ from sage.rings.polynomial.padics.factor.frameelt import FrameElt
 from sage.rings.infinity import infinity
 
 class AssociatedFactor:
+    r"""
+    An irreducible factors of the associated polynomials of higher order
+    newton polygon segments needed for OM computation.
 
+    For each distinct irreducible factor of the associated polynomial,
+    the tree of OM representations branches, thus producing distinct factors
+    of the original polynomial.
+
+    If ``rho`` is not linear, then we have found inertia. Future associated
+    polynomials wll need to be produced over an extension over our ground
+    field by ``rho``.  This can produce a tower of finite field extensions
+    to be worked in.
+
+    INPUT:
+
+    - ``segment`` -- The segment whose associated polynomial self is a factor of.
+
+    - ``rho`` -- The irreducible finite field polynomial factor of the
+      associated polynomial.
+
+    - ``rhoexp`` -- The multiplicity of the factor.
+
+    """
     def __init__(self,segment,rho,rhoexp):
+        """
+        Initializes self.
+
+        See ``AssociatedFactor`` for full documentation.
+
+        """
         self.segment = segment
         self.rho = rho
         self.rhoexp = rhoexp
@@ -34,6 +70,44 @@ class AssociatedFactor:
             self.basis_trans_mat = Matrix([self.FF(b)._vector_() for b in basis])
 
     def FF_elt_to_FFbase_vector(self,a):
+        """
+        Represents an element in our current extended residue field as a
+        vector over its ground residue field.
+
+        INPUT:
+
+        - ``a`` -- Element of our extended residue field
+
+        OUTPUT:
+
+        - A list representing a vector of ``a`` over the ground field of
+          the latest extension.
+
+        EXAMPLES::
+
+        First we set up AssociatedFactors building a tower of extensions::
+
+            sage: from sage.rings.polynomial.padics.factor.factoring import OM_tree
+            sage: k = ZpFM(2,20,'terse'); kx.<x> = k[]
+            sage: t = OM_tree(x^4+20*x^3+44*x^2+80*x+1040)
+            sage: t[0].prev
+            AssociatedFactor of rho z^2 + z + 1
+            sage: t[0].polygon[0].factors[0]
+            AssociatedFactor of rho z0^2 + a0*z0 + 1
+
+        Then we take elements in the different finite fields and represent
+        them as vectors over their base residue field::
+
+            sage: K.<a0> = t[0].prev.FF;K
+            Finite Field in a0 of size 2^2
+            sage: t[0].prev.FF_elt_to_FFbase_vector(a0+1)
+            [1, 1]
+            sage: L.<a1> = t[0].polygon[0].factors[0].FF;L
+            Finite Field in a1 of size 2^4
+            sage: t[0].polygon[0].factors[0].FF_elt_to_FFbase_vector(a1)         
+            [1, a0 + 1]
+
+        """
         if self.segment.frame.is_first() and self.Fplus == 1:
             return a
         elif self.Fplus == 1:
@@ -48,6 +122,39 @@ class AssociatedFactor:
             return s
 
     def FFbase_elt_to_FF(self,b):
+        """
+        Lifts an element up from the previous residue field to the current
+        extended residue field.
+
+        INPUT:
+
+        - ``b`` -- Element in the previous residue field.
+
+        OUTPUT:
+
+        - An element in the current extended residue field.
+
+        EXAMPLES::
+
+        First we set up AssociatedFactors building a tower of extensions::
+
+            sage: from sage.rings.polynomial.padics.factor.factoring import OM_tree
+            sage: k = ZpFM(2,20,'terse'); kx.<x> = k[]
+            sage: t = OM_tree(x^4+20*x^3+44*x^2+80*x+1040)
+
+        Then we take elements in the different finite fields and lift them
+        to the next residue field upward in the extension tower::
+
+            sage: K.<a0> = t[0].prev.FF;K
+            Finite Field in a0 of size 2^2
+            sage: L.<a1> = t[0].polygon[0].factors[0].FF;L
+            Finite Field in a1 of size 2^4
+            sage: t[0].prev.FFbase_elt_to_FF(1)
+            1
+            sage: t[0].polygon[0].factors[0].FFbase_elt_to_FF(a0+1)
+            a1^2 + a1 + 1
+
+        """
         if self.segment.frame.is_first():
             return b
         elif self.Fplus == 1:
@@ -59,10 +166,37 @@ class AssociatedFactor:
             return sum([ bvec[i]*self.FFbase_gamma**i for i in range(len(bvec))])
 
     def __repr__(self):
+        """
+        Representation of self.
+
+        EXAMPLES::
+
+            sage: from sage.rings.polynomial.padics.factor.factoring import OM_tree
+            sage: k = ZpFM(2,20,'terse'); kx.<x> = k[]
+            sage: t = OM_tree(x^4+20*x^3+44*x^2+80*x+1040)
+            sage: t[0].prev.__repr__()
+            'AssociatedFactor of rho z^2 + z + 1'
+            sage: t[0].polygon[0].factors[0].__repr__()
+            'AssociatedFactor of rho z0^2 + a0*z0 + 1'
+
+        """
         return "AssociatedFactor of rho "+repr(self.rho)
 
     def lift(self,delta):
-        # FrameElt representation of a lift of delta
+        """
+        FrameElt representation of a lift of residue field element ``delta``.
+
+        EXAMPLES::
+
+            sage: from sage.rings.polynomial.padics.factor.factoring import OM_tree
+            sage: k = ZpFM(2,20,'terse'); kx.<x> = k[]
+            sage: t = OM_tree(x^4+20*x^3+44*x^2+80*x+1040)
+            sage: K.<a0> = t[0].prev.FF;K
+            Finite Field in a0 of size 2^2
+            sage: t[0].polygon[0].factors[0].lift(a0+1)                
+            [FET<0,[FET<pi^0*1 + O(2^20)>]>, FET<1,[FET<pi^-1*1 + O(2^20)>]>]
+
+        """
         if self.segment.frame.F == 1:
             return FrameElt(self.segment.frame,self.segment.frame.Ox(delta))
         elif self.segment.frame.prev.Fplus == 1:
@@ -72,6 +206,36 @@ class AssociatedFactor:
             return sum([self.segment.frame.prev.gamma_frameelt**i*FrameElt(self.segment.frame,self.segment.frame.prev.lift(dvec[i]),this_exp=0) for i in range(len(dvec)) if dvec[i] != 0])
 
     def next_frame(self,length=infinity):
+        """
+        Produce the child Frame in the tree of OM representations with the
+        partitioning from self.
+
+        This method generates a new Frame with the ``self`` as previous and
+        seeds it with a new approximation with strictly greater valuation
+        than the current one.
+
+        INPUT:
+
+        - ``length`` -- Integer or infinity, default infinity; The length of
+          the segment generating this factor.  This is used to reduce the
+          total number of quotient with remainder operations needed in the
+          resulting Frame.
+
+        EXAMPLES::
+
+            sage: from sage.rings.polynomial.padics.factor.frame import Frame
+            sage: Phi = ZpFM(2,20,'terse')['x'](x^32+16)
+            sage: f = Frame(Phi)
+            sage: f.seed(Phi.parent().gen());f
+            Frame with phi (1 + O(2^20))*x
+            sage: f = f.polygon[0].factors[0].next_frame();f 
+            Frame with phi (1 + O(2^20))*x^8 + (1048574 + O(2^20))
+            sage: f = f.polygon[0].factors[0].next_frame();f
+            Frame with phi (1 + O(2^20))*x^8 + (1048574 + O(2^20))*x^2 + (1048574 + O(2^20))
+            sage: f = f.polygon[0].factors[0].next_frame();f
+            Frame with phi (1 + O(2^20))*x^16 + (1048572 + O(2^20))*x^10 + (1048572 + O(2^20))*x^8 + (1048572 + O(2^20))*x^5 + (4 + O(2^20))*x^4 + (8 + O(2^20))*x^2 + (4 + O(2^20))
+
+        """
         from frame import Frame
         if self.segment.slope == infinity:
             next = Frame(self.segment.frame.Phi,self,self.segment.frame.iteration)

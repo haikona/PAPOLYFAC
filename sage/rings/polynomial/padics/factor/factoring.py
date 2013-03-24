@@ -1,41 +1,53 @@
+r"""
+Methods related to factoring local field polynomials using an OM algorithm
+
+AUTHORS:
+
+- Brian Sinclair (2012-02-22): initial version
+
+"""
 from sage.rings.padics.factory import ZpFM, Zp
 from sage.rings.polynomial.polynomial_ring_constructor import PolynomialRing
 from sage.rings.polynomial.padics.factor.frame import Frame
+from sage.structure.factorization import Factorization
 
 def pfactor(Phi):
     r"""
     Return a factorization of Phi
 
-    This is accomplished by constructing a tree of Frames of approximations of factors
+    This is accomplished by constructing a tree of Frames of approximations
+    of factors.
 
-    INPUT::
+    INPUT:
 
-        - ``Phi`` -- squarefree, monic padic polynomial with fixed precision coefficients
+    - ``Phi`` -- squarefree, monic padic polynomial with fixed precision
+      coefficients
 
-    OUTPUT::
+    OUTPUT:
 
-        - list -- polynomial factors of Phi
+    - A Factorization of the polynomial ``Phi``
 
-    EXAMPLES::
+    EXAMPLES:
 
     Factoring polynomials over Zp(2)[x]::
 
         sage: from sage.rings.polynomial.padics.factor.factoring import jorder4,pfactor
-        sage: f = ZpFM(2,24,'terse')['x']( (x^32+16)*(x^32+16+2^16*x^2)+2^34 )
-        sage: pfactor(f) # long (3.8s)
-        [(1 + O(2^24))*x^64 + (65536 + O(2^24))*x^34 + (32 + O(2^24))*x^32 + (1048576 + O(2^24))*x^2 + (256 + O(2^24))]
+        sage: f = ZpFM(2,50,'terse')['x']( (x^32+16)*(x^32+16+2^16*x^2)+2^34 )
+        sage: factors = pfactor(f); len(factors) # long time (5.7s)
+        2
 
     See the irreducibility of x^32+16 in Zp(2)[x]::
 
         sage: pfactor(ZpFM(2)['x'](x^32+16))
-        [(1 + O(2^20))*x^32 + (2^4 + O(2^20))]
+        (1 + O(2^20))*x^32 + (2^4 + O(2^20))
 
     Test the irreducibility of test polynomial jorder4 for Zp(3)::
 
         sage: len(pfactor(jorder4(3))) == 1
         True
 
-    Factor jorder4 for Zp(5) and Zp(7) and check that the products return the original::
+    Factor jorder4 for Zp(5) and Zp(7) and check that the products return
+    the original::
 
         sage: ff = pfactor(jorder4(5))
         sage: prod(ff) == jorder4(5)
@@ -44,9 +56,15 @@ def pfactor(Phi):
         sage: prod(ff) == jorder4(7)
         True
 
-    AUTHORS::
+    REFERENCES:
 
-        - Brian Sinclair and Sebastian Pauli (2012-02-22): initial version
+        S. Pauli, Factoring polynomials over local fields II.
+        Algorithmic Number Theory, 9th International Symposium, ANTS-IX,
+        Nancy, France, July 2010, LNCS 6197, 301-315, Springer Verlag 2010.
+
+    AUTHORS:
+
+    - Brian Sinclair and Sebastian Pauli (2012-02-22): initial version
 
     """
     # Handle the situation that x is a factor of $\Phi(x)$
@@ -61,54 +79,65 @@ def pfactor(Phi):
 
     # If we only have one leaf, Phi is irreducible, so we do not lift it.
     if len(tree) == 1:
-        return ([Phi.parent().gen()] if x_divides else []) + [Phi]
-    # quo_rem is faster than single_factor_lift, so Phi = f*g are specially handled
+        return Factorization(([(Phi.parent().gen(),1)] if x_divides else []) +
+                             [(Phi,1)])
+    # quo_rem is faster than single_factor_lift, so Phi = f*g is specially handled
     if len(tree) == 2:
         if tree[0].phi.degree() < tree[1].phi.degree():
             fact = single_factor_lift(tree[0])
-            return ([Phi.parent().gen()] if x_divides else []) + [fact,Phi.quo_rem(fact)[0]]
+            return Factorization(([(Phi.parent().gen(),1)] if x_divides else []) +
+                                 [(fact,1),(Phi.quo_rem(fact)[0],1)])
         else:
             fact = single_factor_lift(tree[1])
-            return ([Phi.parent().gen()] if x_divides else []) + [fact,Phi.quo_rem(fact)[0]]            
+            return Factorization(([(Phi.parent().gen(),1)] if x_divides else []) +
+                                 [(fact,1),(Phi.quo_rem(fact)[0],1)])
     # Phi has more than two factors, so we lift them all
-    return ([Phi.parent().gen()] if x_divides else []) + [single_factor_lift(frame) for frame in tree]
+    return Factorization(([(Phi.parent().gen(),1)] if x_divides else []) +
+                         [(single_factor_lift(frame),1) for frame in tree])
 
 
 def OM_tree(Phi):
     r"""
-    Return an OM (Okutsu-Montes / Ore-Mac Lane) tree for Phi
+    Return an tree of OM (Okutsu-Montes/Ore-Mac Lane) representations for Phi.
 
-    INPUT::
+    INPUT:
 
-        - ``Phi`` -- squarefree, monic padic polynomial with fixed precision coefficients
+    - ``Phi`` -- squarefree, monic padic polynomial with fixed precision
+      coefficients
 
-    OUTPUT::
+    OUTPUT:
 
-        - list -- leaves of the OM tree of Phi
+    The leaves of the OM tree of ``Phi`` as a list of Frames.
 
-    AUTHORS::
+    EXAMPLES::
 
-        - Brian Sinclair and Sebastian Pauli (2012-02-22): initial version
+        sage: Phi = ZpFM(2,20,'terse')['x'](x^32+16)
+        sage: OM_tree(Phi)
+        [Frame with phi (1 + O(2^20))*x^16 + (1048572 + O(2^20))*x^10 + (1048572 + O(2^20))*x^8 + (1048572 + O(2^20))*x^5 + (4 + O(2^20))*x^4 + (8 + O(2^20))*x^2 + (4 + O(2^20))]
 
     """
     from sage.misc.flatten import flatten
 
     def followsegment(next,Phi):
-        """ Returns next if it corresponds to an irreducible factor of $\Phi$ 
-            and follows every branch if not """
+        """
+        Returns next if it corresponds to an irreducible factor of $\Phi$ 
+        and follows every branch if not.
+
+        """
         # Handle the unlikely event that our approximation is actually a factor
         if next.is_first() == False and next.phi == next.prev_frame().phi:
             return [next]
         if next.phi_divides_Phi():
-            return [next] + [[followsegment(fact.next_frame(fact.rhoexp+1),Phi)
-                              for fact in seg.factors] for seg in next.polygon[1:]]
+            return [next]+[[followsegment(fact.next_frame(fact.rhoexp+1),Phi)
+                            for fact in seg.factors] for seg in next.polygon[1:]]
         # With E potentially increased, Check to see if E*F == deg(Phi)
         # (and thus Phi is irreducible)
         if next.E * next.F * next.polygon[0].Eplus == Phi.degree():
             return next
         # With F potentially increaded, Check to see if E*F == deg(Phi)
         # (and thus Phi is irreducible)
-        if next.E * next.F * next.polygon[0].Eplus * next.polygon[0].factors[0].Fplus == Phi.degree():
+        if (next.E * next.polygon[0].Eplus * 
+                next.F * next.polygon[0].factors[0].Fplus) == Phi.degree():
             return next
         # Check if we should begin Single Factor Lifting
         if sum([seg.length for seg in next.polygon]) == 1:
@@ -118,7 +147,7 @@ def OM_tree(Phi):
 
     # Construct and initialize the first frame (phi = x)
     next = Frame(Phi)
-    next.first()
+    next.seed(Phi.parent().gen())
 
     # With E potentially increased, Check to see if E*F == deg(Phi)
     # (and thus Phi is irreducible)
@@ -127,7 +156,8 @@ def OM_tree(Phi):
 
     # With F potentially increaded, Check to see if E*F == deg(Phi)
     # (and thus Phi is irreducible)
-    if next.E * next.F * next.polygon[0].Eplus * next.polygon[0].factors[0].Fplus == Phi.degree():
+    if (next.E * next.polygon[0].Eplus * 
+            next.F * next.polygon[0].factors[0].Fplus) == Phi.degree():
         return [next]
 
     # Handle the special case wherein our initial approximation (phi = x) is a factor
@@ -148,11 +178,18 @@ def OM_tree(Phi):
 
 def jorder4(p):
     r"""
-    Produce a particularly complicated example of polynomials for factorization over Zp(p)
+    Produce a particularly complicated example of polynomials for
+    factorization over Zp(p).
 
-    INPUT::
+    This method exists to test p-adic polynomial factorization.
 
-        - ``p`` a prime number
+    INPUT:
+
+    - ``p`` -- a prime number
+
+    OUTPUT:
+
+    - A p-adic polynomial over Zp(``p``)
 
     EXAMPLES::
 
@@ -179,20 +216,35 @@ def jorder4(p):
 
 def single_factor_lift(frame,prec=2**20):
     r"""
-    Lift a frame to a factor
+    Lift a Frame to a factor of the polynomial it approximates.
+
+    INPUT:
+
+    - ``frame`` -- a Frame that is the leaf of an OM tree.
+
+    OUTPUT:
+
+    A factor of the polynomial referred to by the input frame
 
     EXAMPLES::
+
         sage: from sage.rings.polynomial.padics.factor.factoring import single_factor_lift
         sage: from sage.rings.polynomial.padics.factor.frame import Frame
         sage: Kx.<x> = PolynomialRing(ZpFM(3,20,'terse'))
         sage: f = (x**3+x-1)*(x**2+1)
         sage: fr = Frame(f)
-        sage: fr.first()
+        sage: fr.seed(x)
         sage: fr = fr.polygon[0].factors[0].next_frame()
         sage: fact = single_factor_lift(fr) ; fact
         (1 + O(3^20))*x + (904752403 + O(3^20))
         sage: f % fact
         0
+
+    REFERENCES:
+
+        J. Guardia, E. Nart, S. Pauli. Single-factor lifting and
+        factorization of polynomials over local fields.
+        J. Symb. Comput. 47(11): 1318-1346 (2012)
 
     """
     def _reduce(poly,phi,d):
@@ -211,7 +263,7 @@ def single_factor_lift(frame,prec=2**20):
     Lifty = PolynomialRing(LiftRing,names='y')
     Phi = Lifty(frame.Phi)
     phi = Lifty(frame.phi)
-    a0,a1 = frame.elt_phi_expansion()[0:2]
+    a0,a1 = frame._phi_expansion_as_elts[0:2]
 
     Psi = frame.find_psi(-a1.valuation())
     A0 = Psi * a0

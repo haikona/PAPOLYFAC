@@ -1,7 +1,48 @@
+r"""
+Representations of polynomials as sums of powers of OM approximations
+
+A FrameEltTerm object represents a coefficient polynomial multiplied by the
+approximation ``phi`` from the previous term.  In the first term, ``phi``
+is replaced by the uniformizer, presening a valuation-unit representation
+of a constant. The coefficient in FrameEltTerms beyond the first is a
+FrameElt from the previous Frame.
+
+A FrameElt is a polynominal in the current Frame as a sum of powers of the
+current approximation multiplied by polynomial coefficients.. The
+representation is a list of FrameEltTerms, each with a power of the
+approximation and coefficient polynomial.
+
+AUTHORS:
+
+- Brian Sinclair (2012-02-22): initial version
+
+"""
+
 class FrameElt:
-    """Polynomials recursively represented by powers of the approximations $\phi_t(x)$ to a factor of $\Phi(x)$."""
+    """
+    Polynomials recursively represented by powers of the approximations
+    $\phi_t(x)$ to a factor of $\Phi(x)$.
+
+    INPUT:
+
+    - ``frame`` -- The frame (and thus approximation) this refers to.
+
+    - ``a`` -- Polynomial, default None; The polynomial to be represented
+      by self.
+
+    - ``this_exp`` -- Integer, default None; If ``this_exp`` is not None,
+      then self is initialized as having a single term in its sum, namely
+      ``a`` * ``phi`` ^ ``this_exp``
+
+    EXAMPLES::
+
+    """
 
     def __init__(self,frame,a=None,this_exp=None):
+        """
+        Initializes self.
+
+        """
         # deg(a) < deg(frame.phi)*frame.Eplus*frame.Fplus
         self.frame = frame
         if this_exp != None:
@@ -12,10 +53,25 @@ class FrameElt:
         elif frame.is_first():
             self.rep = [FrameEltTerm(self,a,0)]
         else:
-            b = _phi_expansion(a,self.frame.prev_frame().phi)
+            # Compute the phi-expansion of a
+            if self.frame.prev_frame().phi.degree() > a.degree():
+                b = [a]
+            else:
+                b = []
+                q, r = a.quo_rem(self.frame.prev_frame().phi)
+                b.append(r)
+                while q != 0:
+                    q, r = q.quo_rem(self.frame.prev_frame().phi)
+                    b.append(r)
             self.rep = [FrameEltTerm(self,b[i],i) for i in range(len(b)) if b[i].is_zero() == False]
 
     def is_single_term(self):
+        """
+        Returns ``True`` if the FrameElt is a sum of only one term, otherwise ``False``
+
+        EXAMPLES::
+
+        """
         if len(self.rep) == 1:
             if self.frame.prev == None:
                 return True
@@ -24,6 +80,12 @@ class FrameElt:
         return False
 
     def valuation(self,purge=True):
+        """
+        Returns the valuation of self
+
+        EXAMPLES::
+
+        """
         if not purge:
             return min([a.valuation() for a in self.rep])
         else:
@@ -34,6 +96,12 @@ class FrameElt:
             return v
 
     def residue(self):
+        """
+        Returns the residue of self
+
+        EXAMPLES::
+
+        """
         if not self.is_reduced():
             self = self.reduce()
 
@@ -57,6 +125,13 @@ class FrameElt:
             return self.frame.R(0)
 
     def reduce(self):
+        """
+        Uses identities to fix the exponents of self to between
+        zero and E+ times F+.
+
+        EXAMPLES::
+
+        """
         if self.frame.is_first():
             return self
         Eplus = self.frame.prev.segment.Eplus
@@ -79,20 +154,23 @@ class FrameElt:
                 reduced_elt += summand
         return reduced_elt
 
-    def sumcollapse(self):
-        sumt = FrameElt(self.frame)
-        sumc = FrameElt(self.frame)
-        for i in range(len(self.rep)):
-            sumc.rep = [self.rep[i]]
-            sumt += sumc
-        return sumt
-
     def is_reduced(self):
+        """
+        Returns ``True`` if all the exponents of all terms are less
+        than E+, otherwise ``False``.
+
+        EXAMPLES::
+
+        """
         return all([a.is_reduced() for a in self.rep])
 
     def find_denominator(self):
         """
-        Find the lowest power (possibly negative) of the uniformizer in a FrameElt
+        Returns the lowest power (possibly most negative power) of the
+        uniformizer in self.
+
+        EXAMPLES::
+
         """
         if self.frame.is_first():
             return self.rep[0]._exponent
@@ -100,6 +178,13 @@ class FrameElt:
             return min([fet._coefficient.find_denominator() for fet in self.rep])
 
     def polynomial(self,denominator=False):
+        """
+        Returns self as a polynomial, optionally with the power of the
+        uniformizor present in its denominator.
+
+        EXAMPLES::
+
+        """
         if denominator:
             piexp = self.find_denominator()
             if piexp < 0:
@@ -202,24 +287,66 @@ class FrameElt:
             quotient.rep = [a / right.rep[0] for a in self.rep]
             return quotient
 
+    def __getitem__(self,item):
+        return self.rep[item]
+
     def __repr__(self):
         return repr(self.rep)
 
-def _phi_expansion(P,phi):
-    """ Compute the phi-expansion of P """
-    if phi.degree() > P.degree():
-        return [P]
-    expansion = []
-    q, r = P.quo_rem(phi)
-    expansion.append(r)
-    while q != 0:
-        q, r = q.quo_rem(phi)
-        expansion.append(r)
-    return expansion
-
 class FrameEltTerm:
+    """
+    A single term of the sum of powers of OM representations.
 
+    A FrameEltTerm object should be generated and manipulated by a parent
+    FrameElt to which is belongs.
+
+    If the parent FrameElt belongs to the first frame, the FrameEltTerm
+    holds a constnat, namely a * pi ^ e.  For frames beyond the first,
+    a FrameEltTerm contains the exponent of the previous approximation
+    and a FrameElt of the previous frame as a coefficient.
+
+    INPUT:
+
+    - ``frelt`` -- FrameElt. The sum to which this term belongs.
+
+    - ``a`` -- The coefficient of this term.
+
+    - ``e`` -- The exponent of this term.
+
+    EXAMPLES::
+
+    If the parent FrameElt comes from the first frame, the term is a constant::
+
+        sage: from sage.rings.polynomial.padics.factor.frame import Frame
+        sage: k = ZpFM(2,20,'terse'); kx.<x> = k[]
+        sage: f = Frame(x^32+16); f.seed(x)
+        sage: elt = FrameElt(f)   
+        sage: FrameEltTerm(elt,3,2)
+        FET<pi^2*3 + O(2^20)>
+
+    If the uniformizer divides a constant, the FrameElt corrects the exponent::
+
+        sage: FrameEltTerm(elt,6,0)
+        FET<pi^1*3 + O(2^20)>
+        sage: FrameEltTerm(elt,4,0)
+        FET<pi^2*1 + O(2^20)>
+
+    Moving to a higher frame and representing 6x^2 (or 6 * phi ^ 2)::
+
+        sage: f = f.polygon[0].factors[0].next_frame(); f
+        Frame with phi (1 + O(2^20))*x^8 + (1048574 + O(2^20))
+        sage: elt = FrameElt(f)
+        sage: FrameEltTerm(elt,6,2)
+        FET<2,[FET<pi^1*3 + O(2^20)>]>
+        sage: FrameElt(f,6*x^2)[0]
+        FET<2,[FET<pi^1*3 + O(2^20)>]>
+
+    """
     def __init__(self,frelt,a,e):
+        """
+        Initializes self.
+
+        """
         self.frameelt = frelt
         self._scalar_flag = (self.frameelt.frame.prev == None)
         self._exponent = e
@@ -227,7 +354,9 @@ class FrameEltTerm:
         self._zero_flag = False
 
         if a in self.frameelt.frame.Ox or a in self.frameelt.frame.O:
-            self._zero_flag = a.is_zero()
+            if isinstance(a,int):
+                a = self.frameelt.frame.Ox(a)
+            self._zero_flag = a.is_zero() #cannot be replaced by a == 0
             if self._scalar_flag:
                 a = self.frameelt.frame.O(a)
                 if self._zero_flag:
@@ -243,6 +372,10 @@ class FrameEltTerm:
             a._zero_flag = False
 
     def valuation(self):
+        """
+        Returns the valuation of self
+    
+        """
         if self._cached_valuation == None:
             if self.frameelt.frame.prev == None:
                 self._cached_valuation = self._exponent
@@ -251,6 +384,13 @@ class FrameEltTerm:
         return self._cached_valuation
 
     def reduce(self):
+        """
+        Uses identities to fix the exponent of self to be less than
+        E+ times F+.
+
+        EXAMPLES::
+
+        """
         if self.frameelt.frame.prev == None:
             return
         Eplus = self.frameelt.frame.prev.segment.Eplus
@@ -264,6 +404,13 @@ class FrameEltTerm:
         return
 
     def is_reduced(self):
+        """
+        Returns ``True`` if all the exponents of all terms are less
+        than E+, otherwise ``False``.
+
+        EXAMPLES::
+
+        """
         if self.frameelt.frame.prev == None:
             return True
         if self._exponent < self.frameelt.frame.prev.segment.Eplus:
@@ -271,16 +418,45 @@ class FrameEltTerm:
         return False
 
     def is_scalar(self):
+        """
+        Returns ``True`` if the term is just a scalar, otherwise ``False``.
+
+        EXAMPLES::
+
+        """
         return self._scalar_flag
+
     def is_zero(self):
+        """
+        Returns ``True`` if the term is equal to 0, otherwise ``False``.
+
+        EXAMPLES::
+
+        """
         return self._zero_flag
+
     def is_single_term(self):
+        """
+        Returns ``True`` if the term is does not have more than one term
+        at any recursive level, otherwise ``False``.
+
+        EXAMPLES::
+
+        """
         if self._scalar_flag:
             return True
         else:
             return self._coefficient.is_single_term()
 
     def value(self):
+        """
+        Returns the coeffecient part of the term.  For scalars, this is a
+        single number.  For polynomials, this is the FrameElt representing
+        the polynomial coefficient.
+
+        EXAMPLES::
+
+        """
         if self._scalar_flag:
             return self._unit
         else:
@@ -291,6 +467,51 @@ class FrameEltTerm:
     #    We don't add or multiply on FrameEltTerms directly -- the parent FrameElt does this
 
     def __pow__(self,n):
+        """
+        Raise ``self`` to the integer power ``n``.
+
+        Only FrameEltTerms with single terms in all recursive FrameElts
+        and FrameEltTerms can be raised this way.
+
+        EXAMPLES::
+
+        Building the needed framework and squaring 12 as a FrameEltTerm::
+
+            sage: from sage.rings.polynomial.padics.factor.frame import Frame
+            sage: k = ZpFM(2,20,'terse'); kx.<x> = k[]
+            sage: f = Frame(x^32+16); f.seed(x)
+            sage: fet = FrameEltTerm(FrameElt(f),3,2); fet
+            FET<pi^2*3 + O(2^20)>
+            sage: fet.__pow__(2)
+            FET<pi^4*9 + O(2^20)>
+            sage: fet**2        
+            FET<pi^4*9 + O(2^20)>
+
+        Moving to a higher frame and squaring 12x^2 as a FrameEltTerm::
+
+            sage: f = f.polygon[0].factors[0].next_frame()
+            sage: fet = FrameEltTerm(FrameElt(f),12,2); fet
+            FET<2,[FET<pi^2*3 + O(2^20)>]>
+            sage: fet.__pow__(2)                          
+            FET<4,[FET<pi^4*9 + O(2^20)>]>
+            sage: fet**2        
+            FET<4,[FET<pi^4*9 + O(2^20)>]>
+
+        Starting at a depth of 2, we must take care not to try to take
+        powers of non-single-term FrameEltTerms::
+
+            sage: f = f.polygon[0].factors[0].next_frame()
+            sage: f = f.polygon[0].factors[0].next_frame()
+            sage: f.depth
+            2
+            sage: fet = FrameElt(f,x+1)[0]; fet
+            FET<0,[FET<0,[FET<pi^0*1 + O(2^20)>]>, FET<1,[FET<pi^0*1 + O(2^20)>]>]>
+            sage: fet ** 2 # Error
+            Traceback (most recent call last):
+            ...
+            NotImplementedError: Cannot take a power of a non-single term FrameEltTerm
+
+        """
         if not self.is_single_term():
             raise NotImplementedError, "Cannot take a power of a non-single term FrameEltTerm"
         else:
@@ -310,12 +531,40 @@ class FrameEltTerm:
                 return FrameEltTerm(self.frameelt, self._coefficient/right._coefficient, self._exponent-right._exponent)
 
     def __neg__(self):
+        """
+        Return the negative of ``self``.
+
+        OUTPUT: FrameEltTerm
+
+        EXAMPLES::
+
+            sage: from sage.rings.polynomial.padics.factor.frame import Frame
+            sage: k = ZpFM(2,20,'terse'); kx.<x> = k[]
+            sage: f = Frame(x^32+16); f.seed(x)
+            sage: f = f.polygon[0].factors[0].next_frame();
+            sage: elt = FrameElt(f)
+            sage: fet = FrameEltTerm(elt,6,2); fet
+            FET<2,[FET<pi^1*3 + O(2^20)>]>
+            sage: FrameElt(f,6*x^2)[0]
+            FET<2,[FET<pi^1*3 + O(2^20)>]>
+            sage: fet.__neg__()
+            FET<2,[FET<pi^1*524285 + O(2^20)>]>
+            sage: -fet
+            FET<2,[FET<pi^1*524285 + O(2^20)>]>
+            sage: FrameElt(f,-6*x**2)[0]             
+            FET<2,[FET<pi^1*524285 + O(2^20)>]>
+
+        """
         if self.frameelt.frame.is_first():
             return FrameEltTerm(self.frameelt,-self._unit,self._exponent)
         else:
             return FrameEltTerm(self.frameelt,-self._coefficient,self._exponent)
 
     def __repr__(self):
+        """
+        Representation of self.
+
+        """
         if self._zero_flag:
             return 'FET<0>'
         if self._scalar_flag:

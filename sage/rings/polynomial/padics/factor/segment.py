@@ -1,66 +1,75 @@
+r"""
+Segment of a newton polygon of higher order needed for OM computations.
+
+AUTHORS:
+
+- Brian Sinclair (2012-02-22): initial version
+
+"""
 from sage.rings.polynomial.padics.factor.associatedfactor import AssociatedFactor
 from sage.rings.arith import gcd
 from sage.rings.infinity import infinity
+from sage.misc.functional import denominator
 
 class Segment:
+    r"""
+    Segment of a newton polygon of higher order needed for OM computations.
 
+    Segments are typically contained in a list of other Segments comprising
+    the newton polygon of a frame. The Segment needs to be capable of refering
+    back to its orignating frame for information about the polygon.  Further,
+    most of the important data is computed while building the polygon, and is
+    thus passed to the Segment at initialization rather than have it compute
+    these for itself, namely: slope, points on the line, and length.
+
+    Each Segment represents a partitioning of the roots of the original
+    polynomial, and thus each is responsible for branching the OM tree.
+
+    Also, Segments can find their own associated polynomials, whose factors
+    represent further branching of the OM tree.
+
+    INPUT:
+
+    - ``frame`` - Frame; the Frame to whose newton polygon this segment
+      belongs.
+
+    - ``slope`` - Rational or infinity; The slope of the segment.
+
+    - ``vert`` - List of tuples; The list of vertices of points of the
+      associated polynomial found on this segment. Most notably, this
+      needs to include the endpoints of the segment.
+
+    - ``length`` - Integer; The horizontal length of the segment.
+
+    """
     def __init__(self,frame,slope,vert,length):
         """
         Initialises self.
 
-        EXAMPLES::
+        See ``Segment`` for full documentation.
 
         """
         self.frame = frame
         self.vertex = vert
         self.slope = slope
         self.length = length
-        self.Eplus = self.e() / gcd(self.e(),int(self.frame.E))
         if slope != infinity:
+            self.Eplus = (denominator(self.slope) /
+                          gcd(denominator(self.slope),int(self.frame.E)))
             self.psi = self.frame.find_psi(self.slope*self.Eplus)
+        else:
+            self.Eplus = 1
         self._associate_polynomial = self.associate_polynomial(cached=False)
         self.factors = [AssociatedFactor(self,afact[0],afact[1]) 
                         for afact in list(self._associate_polynomial.factor())]
 
-    def h(self):
-        """
-        Return the numerator of the slope of this segment.
-
-        EXAMPLES::
-
-        """
-        if isinstance(self.slope,PlusInfinity):
-            return self.slope
-        if isinstance(self.slope,int):
-            return self.slope.numerator
-        else:
-            return self.slope.numerator()
-    def e(self):
-        """
-        Return the denominator of the slope of this segment.
-
-        EXAMPLES::
-
-        """
-        if self.slope == infinity:
-            return 1
-        if isinstance(self.slope,int):
-            return self.slope.denominator
-        else:
-            return self.slope.denominator()
-
-    def vphi(self):
-        """
-        Return the slope of this segment.
-
-        EXAMPLES::
-
-        """
-        return self.slope
-
     def associate_polynomial(self,cached=True):
         """
         Return the associated polynomial of this segment.
+
+        The associated polynomial is found by taking the points on the
+        segment, shortening the segment by the discovered ramification
+        (the increase in slope denominator) and taking their residues.
 
         INPUT:
 
@@ -69,9 +78,11 @@ class Segment:
 
         OUTPUT:
 
-        - 
+        - The associated polynomial of the segment, a polynomial over the
+          residue field, which may have been extended in previous Frames.
 
         EXAMPLES:
+
         """
         if cached:
             return self._associate_polynomial()
@@ -83,16 +94,18 @@ class Segment:
                 Az = self.frame.prev.FFz.gen() ** self.length
             return Az
 
-        a = self.frame.elt_phi_expansion()
+        a = self.frame._phi_expansion_as_elts
         vertx = [v[0] for v in self.vertex]
         chiex = [int((v-vertx[0]) // self.Eplus) for v in vertx]
         chi = [a[vertx[i]] * self.psi**chiex[i] for i in range(len(vertx))]
         psitilde = self.frame.find_psi(chi[0].valuation())
         Ahat = [(c/psitilde).reduce() for c in chi]
         if self.frame.prev == None:
-            Az = sum([(Ahat[i].residue()) * self.frame.Rz.gen() ** chiex[i] for i in range(len(Ahat))])
+            Az = sum([(Ahat[i].residue())*self.frame.Rz.gen()**chiex[i]
+                       for i in range(len(Ahat))])
         else:
-            Az = sum([(Ahat[i].residue()) * self.frame.prev.FFz.gen() ** chiex[i] for i in range(len(Ahat))])
+            Az = sum([(Ahat[i].residue())*self.frame.prev.FFz.gen()**chiex[i]
+                       for i in range(len(Ahat))])
         return Az
 
     def __repr__(self):
