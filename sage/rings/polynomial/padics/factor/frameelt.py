@@ -42,7 +42,7 @@ class FrameElt:
         sage: k = ZpFM(2,20,'terse'); kx.<x> = k[]
         sage: f = Frame(x^32+16); f.seed(x)
         sage: FrameElt(f,6)
-        [FET<pi^1*3 + O(2^20)>]
+        [3*2^1]
 
     Otherwise the we have an error (from FrameEltTerm)::
 
@@ -57,7 +57,7 @@ class FrameElt:
         sage: f = f.polygon[0].factors[0].next_frame(); f
         Frame with phi (1 + O(2^20))*x^8 + (1048574 + O(2^20))
         sage: FrameElt(f,6*x^2 + 1)
-        [FET<0,[FET<pi^0*1 + O(2^20)>]>, FET<2,[FET<pi^1*3 + O(2^20)>]>]
+        [[1*2^0]phi1^0, [3*2^1]phi1^2]
 
     """
 
@@ -72,13 +72,14 @@ class FrameElt:
         self.frame = frame
         if this_exp != None:
             # initializes a FrameElt of phi_t ^ this_exp * a
-            self.rep = [FrameEltTerm(self,a,this_exp)]
+            self.terms = [FrameEltTerm(self,a,this_exp)]
         elif a == None:
-            self.rep = []
+            self.terms = []
         elif frame.is_first():
-            self.rep = [FrameEltTerm(self,a,0)]
+            self.terms = [FrameEltTerm(self,a,0)]
         else:
             # Compute the phi-expansion of a
+            a = self.frame.Ox(a)
             if self.frame.prev_frame().phi.degree() > a.degree():
                 b = [a]
             else:
@@ -88,7 +89,7 @@ class FrameElt:
                 while q != 0:
                     q, r = q.quo_rem(self.frame.prev_frame().phi)
                     b.append(r)
-            self.rep = [FrameEltTerm(self,b[i],i) for i in range(len(b)) if b[i].is_zero() == False]
+            self.terms = [FrameEltTerm(self,b[i],i) for i in range(len(b)) if b[i].is_zero() == False]
 
     def is_single_term(self):
         """
@@ -97,27 +98,36 @@ class FrameElt:
         EXAMPLES::
 
         """
-        if len(self.rep) == 1:
+        if len(self.terms) == 1:
             if self.frame.prev == None:
                 return True
             else:
-                return self.rep[0]._coefficient.is_single_term()
+                return self.terms[0]._coefficient.is_single_term()
         return False
 
     def valuation(self,purge=True):
         """
-        Returns the valuation of self
+        Returns the valuation of self.
+
+        The valuation of a sum (and thus a FrameElt) is the minimum of the
+        valuations of its terms.
+
+        INPUT:
+
+        - ``purge`` -- Boolean, default True; If True, signals the method
+          to remove any terms from the sum any terms of valuation higher
+          than the minimum.
 
         EXAMPLES::
 
         """
         if not purge:
-            return min([a.valuation() for a in self.rep])
+            return min([a.valuation() for a in self.terms])
         else:
-            if self.rep == []:
+            if self.terms == []:
                 return self.frame.O.precision_cap()
-            v = min([a.valuation() for a in self.rep])
-            self.rep = [a for a in self.rep if a.valuation() == v]
+            v = min([a.valuation() for a in self.terms])
+            self.terms = [a for a in self.terms if a.valuation() == v]
             return v
 
     def residue(self):
@@ -131,9 +141,9 @@ class FrameElt:
             self = self.reduce()
 
         if self.frame.is_first():
-            if self.rep[0]._exponent == 0:
+            if self.terms[0]._exponent == 0:
                 # unable to coerce in Zq
-                return self.frame.R(self.rep[0]._unit)
+                return self.frame.R(self.terms[0]._unit)
             else:
                 return self.frame.R(0)
 
@@ -141,9 +151,9 @@ class FrameElt:
         if self.frame.prev.Fplus > 1:
             psi = self.frame.prev.segment.psi
             gamma = self.frame.prev.gamma
-            residuelist = [gamma**(a._exponent/Eplus)*self.frame.prev.FFbase_elt_to_FF((psi**(a._exponent/Eplus)*a.value()).residue()) for a in self.rep if int(a._exponent) % Eplus == 0]
+            residuelist = [gamma**(a._exponent/Eplus)*self.frame.prev.FFbase_elt_to_FF((psi**(a._exponent/Eplus)*a.value()).residue()) for a in self.terms if int(a._exponent) % Eplus == 0]
         else:
-            residuelist = [a.value().residue() for a in self.rep if int(a._exponent) == 0]
+            residuelist = [a.value().residue() for a in self.terms if int(a._exponent) == 0]
         if len(residuelist) > 0:
             return sum(residuelist)
         else:
@@ -162,20 +172,20 @@ class FrameElt:
         Eplus = self.frame.prev.segment.Eplus
         Fplus = self.frame.prev.Fplus
         reduced_elt = FrameElt(self.frame) # zero FrameElt
-        for a in self.rep:
+        for a in self.terms:
             if a._exponent >= Eplus * Fplus:
                 b = FrameElt(self.frame)
-                b.rep = [FrameEltTerm(b,a.value(),a._exponent - Eplus * Fplus)]
+                b.terms = [FrameEltTerm(b,a.value(),a._exponent - Eplus * Fplus)]
                 b *= self.frame.prev.reduce_elt
                 reduced_elt += b.reduce()
             elif a._exponent < 0:
                 b = FrameElt(self.frame)
-                b.rep = [FrameEltTerm(b,a.value(),a._exponent + Eplus * Fplus)]
+                b.terms = [FrameEltTerm(b,a.value(),a._exponent + Eplus * Fplus)]
                 b *= (self.frame.prev.reduce_elt)**(-1)
                 reduced_elt += b.reduce()
             else:
                 summand = FrameElt(self.frame)
-                summand.rep = [FrameEltTerm(reduced_elt,a.value().reduce(),a._exponent)]
+                summand.terms = [FrameEltTerm(reduced_elt,a.value().reduce(),a._exponent)]
                 reduced_elt += summand
         return reduced_elt
 
@@ -187,7 +197,7 @@ class FrameElt:
         EXAMPLES::
 
         """
-        return all([a.is_reduced() for a in self.rep])
+        return all([a.is_reduced() for a in self.terms])
 
     def find_denominator(self):
         """
@@ -198,9 +208,9 @@ class FrameElt:
 
         """
         if self.frame.is_first():
-            return self.rep[0]._exponent
+            return self.terms[0]._exponent
         else:
-            return min([fet._coefficient.find_denominator() for fet in self.rep])
+            return min([fet._coefficient.find_denominator() for fet in self.terms])
 
     def polynomial(self,denominator=False):
         """
@@ -233,16 +243,16 @@ class FrameElt:
                 return self.polynomial(),0
         else:
             if self.frame.is_first():
-                return self.frame.O.uniformizer()**int(self.rep[0]._exponent)*self.rep[0]._unit
+                return self.frame.O.uniformizer()**int(self.terms[0]._exponent)*self.terms[0]._unit
             else:
-                return sum([self.frame.prev_frame().phi**int(a._exponent)*a._coefficient.polynomial() for a in self.rep])
+                return sum([self.frame.prev_frame().phi**int(a._exponent)*a._coefficient.polynomial() for a in self.terms])
 
     def __neg__(self):
         if self.frame.is_first():
             return FrameElt(self.frame,-self.polynomial())
         else:
             neg = FrameElt(self.frame)
-            neg.rep = [-r for r in self.rep]
+            neg.terms = [-r for r in self.terms]
             return neg
 
     def __radd__(self,l):
@@ -254,40 +264,40 @@ class FrameElt:
             return self
         if self.frame.phi != r.frame.phi:
             raise ValueError, "Cannot add FrameElts with different values of phi"
-        if len(self.rep) == 0:
+        if len(self.terms) == 0:
             return r
         sum = FrameElt(self.frame)
         if self.frame.prev == None:
-            v = min(self.rep[0]._exponent,r.rep[0]._exponent)
+            v = min(self.terms[0]._exponent,r.terms[0]._exponent)
             pi = self.frame.O.uniformizer()
-            usum = self.rep[0]._unit * pi ** (self.rep[0]._exponent - v)
-            usum = usum + r.rep[0]._unit * pi ** (r.rep[0]._exponent - v)
-            sum.rep = [FrameEltTerm(sum,usum,v)]
+            usum = self.terms[0]._unit * pi ** (self.terms[0]._exponent - v)
+            usum = usum + r.terms[0]._unit * pi ** (r.terms[0]._exponent - v)
+            sum.terms = [FrameEltTerm(sum,usum,v)]
         else:
-            if self.rep == []:
-                for k in range(len(r.rep)):
-                    sum.rep.append(FrameEltTerm(sum,r.rep[k].value(),r.rep[k]._exponent))
-            elif r.rep == []:
-                for k in range(len(self.rep)):
-                    sum.rep.append(FrameEltTerm(sum,self.rep[k].value(),self.rep[k]._exponent))
+            if self.terms == []:
+                for k in range(len(r.terms)):
+                    sum.terms.append(FrameEltTerm(sum,r.terms[k].value(),r.terms[k]._exponent))
+            elif r.terms == []:
+                for k in range(len(self.terms)):
+                    sum.terms.append(FrameEltTerm(sum,self.terms[k].value(),self.terms[k]._exponent))
             else:
                 i = 0 ; j = 0
-                while i < len(self.rep) and j < len(r.rep):
-                    if self.rep[i]._exponent < r.rep[j]._exponent:
-                        sum.rep.append(FrameEltTerm(sum,self.rep[i].value(),self.rep[i]._exponent))
+                while i < len(self.terms) and j < len(r.terms):
+                    if self.terms[i]._exponent < r.terms[j]._exponent:
+                        sum.terms.append(FrameEltTerm(sum,self.terms[i].value(),self.terms[i]._exponent))
                         i = i + 1
-                    elif self.rep[i]._exponent > r.rep[j]._exponent:
-                        sum.rep.append(FrameEltTerm(sum,r.rep[j].value(),r.rep[j]._exponent))
+                    elif self.terms[i]._exponent > r.terms[j]._exponent:
+                        sum.terms.append(FrameEltTerm(sum,r.terms[j].value(),r.terms[j]._exponent))
                         j = j + 1
-                    elif self.rep[i]._exponent == r.rep[j]._exponent:
-                        sum.rep.append(FrameEltTerm(sum,self.rep[i].value()+r.rep[j].value(),self.rep[i]._exponent))
+                    elif self.terms[i]._exponent == r.terms[j]._exponent:
+                        sum.terms.append(FrameEltTerm(sum,self.terms[i].value()+r.terms[j].value(),self.terms[i]._exponent))
                         i = i + 1; j = j + 1
-                if j < len(r.rep):
-                    for k in range(j,len(r.rep)):
-                        sum.rep.append(FrameEltTerm(sum,r.rep[k].value(),r.rep[k]._exponent))
-                elif i < len(self.rep):
-                    for k in range(i,len(self.rep)):
-                        sum.rep.append(FrameEltTerm(sum,self.rep[k].value(),self.rep[k]._exponent))
+                if j < len(r.terms):
+                    for k in range(j,len(r.terms)):
+                        sum.terms.append(FrameEltTerm(sum,r.terms[k].value(),r.terms[k]._exponent))
+                elif i < len(self.terms):
+                    for k in range(i,len(self.terms)):
+                        sum.terms.append(FrameEltTerm(sum,self.terms[k].value(),self.terms[k]._exponent))
         return sum
 
     def __rmul__(self,l):
@@ -300,15 +310,15 @@ class FrameElt:
             raise ValueError, "Cannot multiply FrameElts with different frame depths"
         product = FrameElt(self.frame)
         if self.frame.prev == None:
-            v = self.rep[0]._exponent + r.rep[0]._exponent
-            uprod = self.rep[0]._unit
-            uprod = uprod * r.rep[0]._unit
-            product.rep = [FrameEltTerm(product,uprod,v)]
+            v = self.terms[0]._exponent + r.terms[0]._exponent
+            uprod = self.terms[0]._unit
+            uprod = uprod * r.terms[0]._unit
+            product.terms = [FrameEltTerm(product,uprod,v)]
         else:
-            for i in range(len(self.rep)):
+            for i in range(len(self.terms)):
                 summand = FrameElt(self.frame)
-                for j in range(len(r.rep)):
-                    summand.rep.append(FrameEltTerm(product,self.rep[i].value()*r.rep[j].value(),self.rep[i]._exponent+r.rep[j]._exponent))
+                for j in range(len(r.terms)):
+                    summand.terms.append(FrameEltTerm(product,self.terms[i].value()*r.terms[j].value(),self.terms[i]._exponent+r.terms[j]._exponent))
                 product = product + summand
         return product
 
@@ -327,13 +337,13 @@ class FrameElt:
             sage: k = ZpFM(2,20,'terse'); kx.<x> = k[]
             sage: f = Frame(x^32+16); f.seed(x)
             sage: fe = FrameElt(f,6); fe
-            [FET<pi^1*3 + O(2^20)>]
+            [3*2^1]
             sage: fe.polynomial()
             6 + O(2^20)
             sage: fe.__pow__(2)
-            [FET<pi^2*9 + O(2^20)>]
+            [9*2^2]
             sage: fe ** 2
-            [FET<pi^2*9 + O(2^20)>]
+            [9*2^2]
             sage: (fe**2).polynomial()
             36 + O(2^20)
 
@@ -341,13 +351,13 @@ class FrameElt:
 
             sage: f = f.polygon[0].factors[0].next_frame()
             sage: fe = FrameElt(f,6*x**2);fe  
-            [FET<2,[FET<pi^1*3 + O(2^20)>]>]
+            [[3*2^1]phi1^2]
             sage: fe.polynomial()
             (6 + O(2^20))*x^2
             sage: fe.__pow__(2)                          
-            [FET<4,[FET<pi^2*9 + O(2^20)>]>]
+            [[9*2^2]phi1^4]
             sage: fe**2        
-            [FET<4,[FET<pi^2*9 + O(2^20)>]>]
+            [[9*2^2]phi1^4]
             sage: (fe**2).polynomial()
             (36 + O(2^20))*x^4
 
@@ -355,7 +365,7 @@ class FrameElt:
         try to take powers of non-single-term FrameElts::
 
             sage: fe = FrameElt(f,6*x^2+1); fe
-            [FET<0,[FET<pi^0*1 + O(2^20)>]>, FET<2,[FET<pi^1*3 + O(2^20)>]>]
+            [[1*2^0]phi1^0, [3*2^1]phi1^2]
             sage: fe ** 2
             Traceback (most recent call last):
             ...
@@ -366,7 +376,7 @@ class FrameElt:
             raise NotImplementedError, "Cannot take a power of a non-single term FrameElt"
         else:
             product = FrameElt(self.frame)
-            product.rep = [self.rep[0]**n]
+            product.terms = [self.terms[0]**n]
             return product
 
     def __div__(self,right):
@@ -374,14 +384,14 @@ class FrameElt:
             raise NotImplementedError, "Cannot divide by a non-single term FrameElt"
         else:
             quotient = FrameElt(self.frame)
-            quotient.rep = [a / right.rep[0] for a in self.rep]
+            quotient.terms = [a / right.terms[0] for a in self.terms]
             return quotient
 
     def __getitem__(self,item):
-        return self.rep[item]
+        return self.terms[item]
 
     def __repr__(self):
-        return repr(self.rep)
+        return repr(self.terms)
 
 class FrameEltTerm:
     """
@@ -412,14 +422,14 @@ class FrameEltTerm:
         sage: f = Frame(x^32+16); f.seed(x)
         sage: elt = FrameElt(f)
         sage: FrameEltTerm(elt,3,2)
-        FET<pi^2*3 + O(2^20)>
+        3*2^2
 
     If the uniformizer divides a constant, the FrameEltTerm corrects the exponent::
 
         sage: FrameEltTerm(elt,6,0)
-        FET<pi^1*3 + O(2^20)>
+        3*2^1
         sage: FrameEltTerm(elt,4,0)
-        FET<pi^2*1 + O(2^20)>
+        1*2^2
 
     Moving to a higher frame and representing 6x^2 (or 6 * phi ^ 2)::
 
@@ -427,9 +437,9 @@ class FrameEltTerm:
         Frame with phi (1 + O(2^20))*x^8 + (1048574 + O(2^20))
         sage: elt = FrameElt(f)
         sage: FrameEltTerm(elt,6,2)
-        FET<2,[FET<pi^1*3 + O(2^20)>]>
+        [3*2^1]phi1^2
         sage: FrameElt(f,6*x^2)[0]
-        FET<2,[FET<pi^1*3 + O(2^20)>]>
+        [3*2^1]phi1^2
 
     """
     def __init__(self,frelt,a,e):
@@ -573,21 +583,21 @@ class FrameEltTerm:
             sage: k = ZpFM(2,20,'terse'); kx.<x> = k[]
             sage: f = Frame(x^32+16); f.seed(x)
             sage: fet = FrameEltTerm(FrameElt(f),3,2); fet
-            FET<pi^2*3 + O(2^20)>
+            3*2^2
             sage: fet.__pow__(2)
-            FET<pi^4*9 + O(2^20)>
+            9*2^4
             sage: fet**2        
-            FET<pi^4*9 + O(2^20)>
+            9*2^4
 
         Moving to a higher frame and squaring 12x^2 as a FrameEltTerm::
 
             sage: f = f.polygon[0].factors[0].next_frame()
             sage: fet = FrameEltTerm(FrameElt(f),12,2); fet
-            FET<2,[FET<pi^2*3 + O(2^20)>]>
+            [3*2^2]phi1^2
             sage: fet.__pow__(2)                          
-            FET<4,[FET<pi^4*9 + O(2^20)>]>
+            [9*2^4]phi1^4
             sage: fet**2        
-            FET<4,[FET<pi^4*9 + O(2^20)>]>
+            [9*2^4]phi1^4
 
         Starting at a depth of 2, we must take care not to try to take
         powers of non-single-term FrameEltTerms::
@@ -597,7 +607,7 @@ class FrameEltTerm:
             sage: f.depth
             2
             sage: fet = FrameElt(f,x+1)[0]; fet
-            FET<0,[FET<0,[FET<pi^0*1 + O(2^20)>]>, FET<1,[FET<pi^0*1 + O(2^20)>]>]>
+            [[1*2^0]phi1^0, [1*2^0]phi1^1]phi2^0
             sage: fet ** 2 # Error
             Traceback (most recent call last):
             ...
@@ -636,15 +646,15 @@ class FrameEltTerm:
             sage: f = f.polygon[0].factors[0].next_frame();
             sage: elt = FrameElt(f)
             sage: fet = FrameEltTerm(elt,6,2); fet
-            FET<2,[FET<pi^1*3 + O(2^20)>]>
+            [3*2^1]phi1^2
             sage: FrameElt(f,6*x^2)[0]
-            FET<2,[FET<pi^1*3 + O(2^20)>]>
+            [3*2^1]phi1^2
             sage: fet.__neg__()
-            FET<2,[FET<pi^1*524285 + O(2^20)>]>
+            [524285*2^1]phi1^2
             sage: -fet
-            FET<2,[FET<pi^1*524285 + O(2^20)>]>
+            [524285*2^1]phi1^2
             sage: FrameElt(f,-6*x**2)[0]             
-            FET<2,[FET<pi^1*524285 + O(2^20)>]>
+            [524285*2^1]phi1^2
 
         """
         if self.frameelt.frame.is_first():
@@ -658,8 +668,14 @@ class FrameEltTerm:
 
         """
         if self._zero_flag:
-            return 'FET<0>'
+            return 0
         if self._scalar_flag:
-            return 'FET<pi^'+repr(self._exponent)+'*'+repr(self._unit)+'>'
+            return repr(self._unit.lift())+'*'+repr(self.frameelt.frame.O.uniformizer().lift())+'^'+repr(self._exponent)
         else:
-            return 'FET<'+repr(self._exponent)+','+repr(self._coefficient)+'>'
+            return repr(self._coefficient)+'phi'+repr(self.frameelt.frame.depth)+'^'+repr(self._exponent)
+        #if self._zero_flag:
+        #    return 'FET<0>'
+        #if self._scalar_flag:
+        #    return 'FET<pi^'+repr(self._exponent)+'*'+repr(self._unit)+'>'
+        #else:
+        #    return 'FET<'+repr(self._exponent)+','+repr(self._coefficient)+'>'

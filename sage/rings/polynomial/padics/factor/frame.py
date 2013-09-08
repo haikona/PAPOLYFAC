@@ -199,7 +199,7 @@ class Frame:
             raise ValueError, "Denominator of given valuation does not divide E"
         psielt = FrameElt(self)
         if self.prev == None:
-            psielt.rep = [FrameEltTerm(psielt,self.O(1),val)]
+            psielt.terms = [FrameEltTerm(psielt,self.O(1),val)]
         else:
             vphi = self.prev.segment.slope
             d = self.prev_frame().E
@@ -214,7 +214,7 @@ class Frame:
                 else:
                     s = int(s % psimod)
             val = val - s * vphi
-            psielt.rep = [FrameEltTerm(psielt,self.prev_frame().find_psi(val),s)]
+            psielt.terms = [FrameEltTerm(psielt,self.prev_frame().find_psi(val),s)]
         return psielt
 
     def _newton_polygon(self,a,xoffset=0):
