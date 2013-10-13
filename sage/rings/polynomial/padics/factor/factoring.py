@@ -111,6 +111,7 @@ def OM_tree(Phi):
 
     EXAMPLES::
 
+        sage: from sage.rings.polynomial.padics.factor.factoring import OM_tree
         sage: Phi = ZpFM(2,20,'terse')['x'](x^32+16)
         sage: OM_tree(Phi)
         [Frame with phi (1 + O(2^20))*x^16 + (1048572 + O(2^20))*x^10 + (1048572 + O(2^20))*x^8 + (1048572 + O(2^20))*x^5 + (4 + O(2^20))*x^4 + (8 + O(2^20))*x^2 + (4 + O(2^20))]

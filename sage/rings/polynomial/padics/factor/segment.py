@@ -45,7 +45,8 @@ class Segment:
 
     Polygons will only have one segment if they cannot show reducibility::
 
-        sage: from sage.rings.polynomial.padics.factor.frame import Frame    
+        sage: from sage.rings.polynomial.padics.factor.frame import Frame
+        sage: from sage.rings.polynomial.padics.factor.segment import Segment
         sage: Phi = ZpFM(2,20,'terse')['x'](x^32+16)
         sage: f = Frame(Phi); f.seed(Phi.parent().gen())
         sage: f.polygon
@@ -141,6 +142,7 @@ class Segment:
         EXAMPLES::
 
             sage: from sage.rings.polynomial.padics.factor.frame import Frame
+            sage: from sage.rings.polynomial.padics.factor.segment import Segment
             sage: Phi = ZpFM(2,20,'terse')['x'](x^32+16)    
             sage: f = Frame(Phi); f.seed(Phi.parent().gen())
             sage: seg = Segment(f,1/8,[(0,4),(32,0)],32); seg

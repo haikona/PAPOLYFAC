@@ -45,6 +45,7 @@ class Frame:
 
     Creating a Frame leaves it unseeded, not having an approximation::
 
+        sage: from sage.rings.polynomial.padics.factor.frame import *
         sage: Phi = ZpFM(2,20,'terse')['x'](x^32+16)
         sage: f = Frame(Phi)
         sage: f
@@ -118,6 +119,7 @@ class Frame:
 
         EXAMPLES::
 
+            sage: from sage.rings.polynomial.padics.factor.frame import *
             sage: Phi = ZpFM(2,20,'terse')['x'](x^32+16)
             sage: f = Frame(Phi); f
             Unseeded Frame regarding (1 + O(2^20))*x^32 + (16 + O(2^20))
@@ -166,6 +168,7 @@ class Frame:
 
         First we need an appropriate Frame::
 
+            sage: from sage.rings.polynomial.padics.factor.frame import *
             sage: Phi = ZpFM(2,20,'terse')['x'](x^16+16)
             sage: f = Frame(Phi)
             sage: f.seed(Phi.parent().gen())
@@ -180,8 +183,8 @@ class Frame:
             4
             sage: f.prev.segment.slope
             1/4
-            sage: f.find_psi(7/4)             
-            [FET<3,[FET<pi^1*1 + O(2^20)>]>]
+            sage: f.find_psi(7/4)
+            [[1*2^1]phi1^3]
             sage: f.find_psi(7/4).polynomial()
             (2 + O(2^20))*x^3
 
@@ -241,6 +244,7 @@ class Frame:
 
         EXAMPLES::
 
+            sage: from sage.rings.polynomial.padics.factor.frame import *
             sage: Phi = ZpFM(2,20,'terse')['x'](x*(x+1)*(x+2))
             sage: f = Frame(Phi)
             sage: f.seed(Phi.parent().gen())
@@ -299,6 +303,7 @@ class Frame:
 
         EXAMPLES::
 
+            sage: from sage.rings.polynomial.padics.factor.frame import *
             sage: Phi = ZpFM(2,20,'terse')['x'](x^32+16)
             sage: f = Frame(Phi)
             sage: f.seed(Phi.parent().gen())
@@ -327,6 +332,7 @@ class Frame:
 
         EXAMPLES::
 
+            sage: from sage.rings.polynomial.padics.factor.frame import *
             sage: Phi = ZpFM(2,20,'terse')['x'](x^32+16)
             sage: f = Frame(Phi)
             sage: f.is_first()
@@ -348,6 +354,7 @@ class Frame:
 
         EXAMPLES::
 
+            sage: from sage.rings.polynomial.padics.factor.frame import *
             sage: Phi = ZpFM(2,20,'terse')['x'](x^3+x)          
             sage: f = Frame(Phi)
             sage: f.seed(Phi.parent().gen())
@@ -367,6 +374,7 @@ class Frame:
         
         EXAMPLES::
 
+            sage: from sage.rings.polynomial.padics.factor.frame import *
             sage: Phi = ZpFM(2,20,'terse')['x'](x^32+16)        
             sage: f = Frame(Phi)
             sage: f.__repr__()

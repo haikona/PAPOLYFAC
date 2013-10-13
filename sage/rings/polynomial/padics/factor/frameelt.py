@@ -446,6 +446,8 @@ class FrameEltTerm:
         """
         Initializes self.
 
+        See ``FrameEltTerm`` for full documentation.
+
         """
         self.frameelt = frelt
         self._scalar_flag = (self.frameelt.frame.prev == None)
