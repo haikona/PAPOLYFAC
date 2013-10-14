@@ -38,6 +38,7 @@ class FrameElt:
 
     If the FrameElt comes from the first frame, the term must be a constant::
 
+        sage: from sage.rings.polynomial.padics.factor.frameelt import FrameElt
         sage: from sage.rings.polynomial.padics.factor.frame import Frame
         sage: k = ZpFM(2,20,'terse'); kx.<x> = k[]
         sage: f = Frame(x^32+16); f.seed(x)
@@ -333,6 +334,7 @@ class FrameElt:
 
         Building the needed framework and squaring 6 as a FrameElt::
 
+            sage: from sage.rings.polynomial.padics.factor.frameelt import FrameElt
             sage: from sage.rings.polynomial.padics.factor.frame import Frame
             sage: k = ZpFM(2,20,'terse'); kx.<x> = k[]
             sage: f = Frame(x^32+16); f.seed(x)
@@ -417,6 +419,7 @@ class FrameEltTerm:
 
     If the parent FrameElt comes from the first frame, the term is a constant::
 
+        sage: from sage.rings.polynomial.padics.factor.frameelt import FrameElt,FrameEltTerm
         sage: from sage.rings.polynomial.padics.factor.frame import Frame
         sage: k = ZpFM(2,20,'terse'); kx.<x> = k[]
         sage: f = Frame(x^32+16); f.seed(x)
@@ -445,6 +448,8 @@ class FrameEltTerm:
     def __init__(self,frelt,a,e):
         """
         Initializes self.
+
+        See ``FrameEltTerm`` for full documentation.
 
         """
         self.frameelt = frelt
@@ -579,6 +584,7 @@ class FrameEltTerm:
 
         Building the needed framework and squaring 12 as a FrameEltTerm::
 
+            sage: from sage.rings.polynomial.padics.factor.frameelt import FrameElt,FrameEltTerm
             sage: from sage.rings.polynomial.padics.factor.frame import Frame
             sage: k = ZpFM(2,20,'terse'); kx.<x> = k[]
             sage: f = Frame(x^32+16); f.seed(x)
@@ -640,6 +646,7 @@ class FrameEltTerm:
 
         EXAMPLES::
 
+            sage: from sage.rings.polynomial.padics.factor.frameelt import FrameElt,FrameEltTerm
             sage: from sage.rings.polynomial.padics.factor.frame import Frame
             sage: k = ZpFM(2,20,'terse'); kx.<x> = k[]
             sage: f = Frame(x^32+16); f.seed(x)

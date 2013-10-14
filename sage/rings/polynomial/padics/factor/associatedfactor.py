@@ -193,8 +193,8 @@ class AssociatedFactor:
             sage: t = OM_tree(x^4+20*x^3+44*x^2+80*x+1040)
             sage: K.<a0> = t[0].prev.FF;K
             Finite Field in a0 of size 2^2
-            sage: t[0].polygon[0].factors[0].lift(a0+1)                
-            [FET<0,[FET<pi^0*1 + O(2^20)>]>, FET<1,[FET<pi^-1*1 + O(2^20)>]>]
+            sage: t[0].polygon[0].factors[0].lift(a0+1)
+            [[1*2^0]phi1^0, [1*2^-1]phi1^1]
 
         """
         if self.segment.frame.F == 1:
